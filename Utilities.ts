@@ -1,3 +1,12 @@
+///<reference path="typings/node/node.d.ts"/>
+
+import * as fs from "fs";
+import * as path from "path";
+import * as childProcess from "child_process";
+
+export const ipv4Regex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+export const etMods = ["etmain", "etpro", "etjump", "etpub", "silent", "jaymod", "etrun", "tjmod"];
+
 /**
  * Strips any Q3 color codes from the text and returns the stripped text
  * @param text
@@ -39,7 +48,7 @@ const notAllowedCharacters = [
  * @returns {string}
  */
 export function escapeText(text: string) {
-    var escaped = "";
+    let escaped = "";
 
     for (let i = 0, len = text.length; i < len; ++i) {
         let c = text[i].charCodeAt(0);
@@ -49,4 +58,128 @@ export function escapeText(text: string) {
     }
 
     return escaped;
+}
+
+const requiredFiles = ["pak0.pk3", "pak1.pk3", "pak2.pk3", "mp_bin.pk3"];
+
+/**
+ * Checks that the base path exists and that it contains all the necessary
+ * files
+ * @param path
+ * @returns {boolean}
+ */
+export function validateBasepath(basepath: string) {
+    let stat;
+    try {
+        stat = fs.statSync(basepath);
+    } catch (e) {
+        return false;
+    }
+    if (!stat.isDirectory()) {
+        return false;
+    }
+    let etmainPath = path.join(basepath, "etmain");
+    let dirContents;
+    try {
+        dirContents = fs.readdirSync(etmainPath);
+    } catch (e) {
+        return false;
+    }
+    let necessaryFilesExist = requiredFiles.every((requiredFile) => {
+        return dirContents.indexOf(requiredFile) !== -1;
+    });
+    return necessaryFilesExist;
+}
+
+/**
+ * Checks the the homepath exists.
+ * @param path
+ * @returns {boolean}
+ */
+export function validateHomepath(homepath: string) {
+    let stat;
+    try {
+        stat = fs.statSync(homepath);
+    } catch (e) {
+        return false;
+    }
+    if (!stat.isDirectory()) {
+        return false;
+    }
+    return true;
+}
+
+/**
+ * Checks that the ip address either a correct ipv4 address or `localhost`
+ * @param ipAddress
+ * @returns {boolean}
+ */
+export function validateIPAdress(ipAddress: string) {
+    return ipAddress === "localhost" || ipv4Regex.exec(ipAddress) !== null;
+}
+
+/**
+ * Checks that the port is
+ * @param port
+ * @returns {boolean}
+ */
+export function validatePort(port: number) {
+    return port > 1024 && port < 65536;
+}
+
+/**
+ * Checks thet the mod is in the etMods list
+ * @param mod
+ * @returns {boolean}
+ */
+export function validateMod(mod: string) {
+    return etMods.indexOf(mod) !== -1;
+}
+
+/**
+ * Makes sure that the file exists
+ * @param path
+ * @returns {boolean}
+ */
+export function fileExists(path: string) {
+    let exists;
+    try {
+        exists = fs.statSync(path);
+    } catch (e) {
+        return false;
+    }
+    return exists.isFile();
+}
+
+export interface ExecPaths {
+    [command: string]: string;
+}
+
+/**
+ * Uses the which command to search for possible executable paths.
+ * If no which command is found or no executable paths are found
+ * returns an empty array
+ * @param commands
+ * @returns
+ */
+export function tryToGetExecPaths(commands: Array<string>) {
+    const whichPath = "/usr/bin/which";
+    let result: ExecPaths = {};
+    // check if which exists
+    let stat;
+    try {
+        stat = fs.statSync(whichPath);
+    } catch (e) {
+        return result;
+    }
+    if (!stat.isFile()) {
+        return result;
+    }
+    commands.forEach((cmd) => {
+        try {
+            result[cmd] = childProcess.execFileSync(whichPath, [cmd]).toString().trim();
+        } catch (e) {
+        }
+    });
+    return result;
 }

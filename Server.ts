@@ -3,24 +3,57 @@ import * as dgram from "dgram";
 import Timer = NodeJS.Timer;
 
 export interface ServerOptions {
-    ipAddress: string;
-    port: number;
     timeout?: number;
 }
+
+export interface ServerInformation {
+    name: string;
+    ipAddress: string;
+    port: number;
+    basepath: string;
+    homepath: string;
+    mod: string;
+    user: string;
+    configs: Array<string>;
+    customExecutable: string;
+    running?: boolean;
+    pid?: number;
+}
+
 
 const udpTimeout = 1000;
 const getStatusBuffer = new Buffer("\xff\xff\xff\xffgetstatus", "ascii");
 
-export class Server {
-    private ipAddress: string;
-    private port: number;
+export class Server implements ServerInformation {
+
+    name: string;
+    ipAddress: string;
+    port: number;
+    basepath: string;
+    homepath: string;
+    mod: string;
+    user: string;
+    configs: Array<string>;
+    customExecutable: string;
+    running: boolean;
+    pid: number;
+
     private udpTimeout: number;
-    constructor(options: ServerOptions) {
-        if (!options.ipAddress) {
+    constructor(information: ServerInformation, options: ServerOptions) {
+        if (!information.ipAddress) {
             throw "Server does not have an IP address specified in options.";
         }
-        this.ipAddress = options.ipAddress;
-        this.port = options.port ? options.port : 27960;
+        this.name = information.name;
+        this.ipAddress = information.ipAddress;
+        this.port = information.port;
+        this.basepath = information.basepath;
+        this.homepath = information.homepath;
+        this.mod = information.mod;
+        this.user = information.user;
+        this.configs = information.configs;
+        this.customExecutable = information.customExecutable;
+        this.running = information.running;
+        this.pid = information.pid;
         this.udpTimeout = options.timeout || udpTimeout;
     }
 

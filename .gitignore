@@ -37,3 +37,14 @@ node_modules
 
 # sourcemaps
 *.js.map
+
+# Vagrant
+.vagrant
+Vagrantfile
+
+# app config
+servers.json
+config.json
+
+# local testing
+testfolder

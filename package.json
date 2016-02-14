@@ -17,7 +17,9 @@
   },
   "homepage": "https://github.com/haapanen/keep-et-up#readme",
   "dependencies": {
-    "commander": "^2.9.0"
+    "colors": "^1.1.2",
+    "commander": "^2.9.0",
+    "prompt": "^0.2.14"
   },
   "devDependencies": {
     "mocha": "^2.4.5"
