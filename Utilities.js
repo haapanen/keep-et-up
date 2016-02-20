@@ -1,5 +1,13 @@
 ///<reference path="typings/node/node.d.ts"/>
 "use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator.throw(value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : new P(function (resolve) { resolve(result.value); }).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments)).next());
+    });
+};
 const fs = require("fs");
 const path = require("path");
 const childProcess = require("child_process");
@@ -183,4 +191,70 @@ function tryToGetExecPaths(commands) {
     return result;
 }
 exports.tryToGetExecPaths = tryToGetExecPaths;
+/**
+ * User lookup. Returns the UID or -1 if no matching user was found.
+ * @param name
+ * @returns {number}
+ */
+function findUid(name) {
+    const idPath = "/usr/bin/id";
+    let result;
+    try {
+        result = childProcess.execFileSync(idPath, ["-u", name]).toString().trim();
+        for (let i = 0, len = result.length; i < len; ++i) {
+            if (result[i] < '0' || result[i] > '9') {
+                return -1;
+            }
+        }
+    }
+    catch (e) {
+        console.error(e);
+        return -1;
+    }
+    return parseInt(result, 10);
+}
+exports.findUid = findUid;
+/**
+ * Stops execution for a moment, does not block
+ * @param millis
+ * @returns {Promise<T>}
+ */
+function asyncSleep(millis) {
+    return __awaiter(this, void 0, void 0, function* () {
+        return new Promise((resolve) => {
+            setTimeout(() => {
+                resolve();
+            }, millis);
+        });
+    });
+}
+exports.asyncSleep = asyncSleep;
+/**
+ * Validates config
+ * @param config
+ * @returns {{errors: Array<string>, success: boolean}}
+ */
+function validateConfig(config) {
+    let errors = [];
+    if (!config.etdedPath || config.etdedPath.length === 0) {
+        errors.push("etded executable path is missing.");
+    }
+    if (!config.killPath || config.killPath.length === 0) {
+        errors.push("process kill command path is missing.");
+    }
+    if (!config.pgrepPath || config.pgrepPath.length === 0) {
+        errors.push("pgrep command path is missing");
+    }
+    if (!config.screenPath || config.screenPath.length === 0) {
+        errors.push("screen path is missing");
+    }
+    if (!config.suPath || config.suPath.length === 0) {
+        errors.push("su path is missing");
+    }
+    return {
+        errors: errors,
+        success: errors.length > 0
+    };
+}
+exports.validateConfig = validateConfig;
 //# sourceMappingURL=Utilities.js.map

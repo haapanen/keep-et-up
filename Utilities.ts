@@ -3,6 +3,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as childProcess from "child_process";
+import {Configuration} from "./Main";
 
 export const ipv4Regex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
 export const etMods = ["etmain", "etpro", "etjump", "etpub", "silent", "jaymod", "etrun", "tjmod"];
@@ -182,4 +183,75 @@ export function tryToGetExecPaths(commands: Array<string>) {
         }
     });
     return result;
+}
+
+/**
+ * User lookup. Returns the UID or -1 if no matching user was found.
+ * @param name
+ * @returns {number}
+ */
+export function findUid(name: string): number {
+    const idPath = "/usr/bin/id";
+    let result;
+    try {
+        result = childProcess.execFileSync(idPath, ["-u", name]).toString().trim();
+        for (let i = 0, len = result.length; i < len; ++i) {
+            if (result[i] < '0' || result[i] > '9') {
+                return -1;
+            }
+        }
+    } catch (e) {
+        console.error(e);
+        return -1;
+    }
+
+    return parseInt(result, 10);
+}
+
+/**
+ * Stops execution for a moment, does not block
+ * @param millis
+ * @returns {Promise<T>}
+ */
+export async function asyncSleep(millis: number) {
+    return new Promise((resolve) => {
+        setTimeout(() => {
+            resolve();
+        }, millis);
+    });
+}
+
+/**
+ * Validates config
+ * @param config
+ * @returns {{errors: Array<string>, success: boolean}}
+ */
+export function validateConfig(config: Configuration) {
+    let errors:Array<string> = [];
+
+    if (!config.etdedPath || config.etdedPath.length === 0) {
+
+        errors.push("etded executable path is missing.");
+    }
+
+    if (!config.killPath || config.killPath.length === 0) {
+        errors.push("process kill command path is missing.");
+    }
+
+    if (!config.pgrepPath || config.pgrepPath.length === 0) {
+        errors.push("pgrep command path is missing");
+    }
+
+    if (!config.screenPath || config.screenPath.length === 0) {
+        errors.push("screen path is missing");
+    }
+
+    if (!config.suPath || config.suPath.length === 0) {
+        errors.push("su path is missing");
+    }
+
+    return {
+        errors: errors,
+        success: errors.length > 0
+    }
 }

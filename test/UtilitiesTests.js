@@ -10,6 +10,7 @@ const Utilities_4 = require("../Utilities");
 const Utilities_5 = require("../Utilities");
 const Utilities_6 = require("../Utilities");
 const Utilities_7 = require("../Utilities");
+const Utilities_8 = require("../Utilities");
 describe("stripColors", () => {
     it("should return an empty string if it only has color codes", () => {
         const text = "^1^2^3^4^5^6^7^8^9";
@@ -116,6 +117,11 @@ describe("fileExists", () => {
     });
     it("should fail with an invalid file", () => {
         assert.equal(Utilities_7.fileExists("does-not-exist.txt"), false);
+    });
+});
+describe("findUid", () => {
+    it("should not fail with root id", () => {
+        assert.equal(Utilities_8.findUid("root"), 0);
     });
 });
 //# sourceMappingURL=UtilitiesTests.js.map

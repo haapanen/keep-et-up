@@ -2,6 +2,8 @@
 ///<reference path="typings/commander/commander.d.ts"/>
 ///<reference path="typings/prompt/prompt.d.ts"/>
 ///<reference path="typings/colors/colors.d.ts"/>
+///<reference path="typings/moment/moment-node.d.ts"/>
+
 
 import * as colors from "colors";
 import * as commander from "commander";
@@ -17,7 +19,7 @@ interface PackageJSON {
     description: string;
 }
 
-interface Configuration {
+export interface Configuration {
     etdedPath: string;
     screenPath: string;
     pgrepPath: string;
@@ -28,12 +30,22 @@ interface Configuration {
 class Main {
     private packageJSON: PackageJSON;
     private config: Configuration;
+    private serversInformation: Array<ServerInformation> = [];
+    private servers: Array<Server> = [];
 
     constructor(args: Array<string>) {
-        this.readPackageJSON();
-        if (!this.readConfig()) {
+        this.init(args);
+    }
+
+    private async init(args) {
+        this.readPackageJSON("./package.json");
+        let readConfigResult = await this.readConfig("./config.json");
+        if (!readConfigResult) {
             process.exit(1);
         }
+        this.config = readConfigResult;
+        this.serversInformation = this.readServersInformation("./servers.json");
+        this.servers = this.parseServers(this.serversInformation);
 
         commander
             .description(this.packageJSON.description)
@@ -42,169 +54,113 @@ class Main {
         commander
             .command("list")
             .description("list all servers")
-            .action(this.list);
+            .action(this.list.bind(this));
         commander
             .command("start <server>")
             .description("start server")
-            .action(this.start);
+            .action(this.start.bind(this));
         commander
             .command("stop <server>")
             .description("stop server")
-            .action(this.stop);
+            .action(this.stop.bind(this));
         commander
             .command("restart <server>")
             .description("restart server")
-            .action(this.restart);
+            .action(this.restart.bind(this));
         commander
             .command("status <server>")
             .description("print server statuses")
-            .action(this.status);
+            .action(this.status.bind(this));
         commander
             .command("add")
             .description("add a new server")
-            .action(this.addServer);
+            .action(this.addServer.bind(this));
         commander
             .command("edit <server>")
             .description("edit an existing server")
-            .action(this.editServer);
+            .action(this.editServer.bind(this));
         commander
-            .command("test <arg>")
-            .description("Does things")
-            .action(this.testAction);
+            .command("loop")
+            .description("starts the infinite loop that will check that all servers are up")
+            .action(this.loop.bind(this));
 
         commander.parse(args);
-    }
 
-    /**
-     * Reads and stores the contents of package.json for later usage
-     * (mainly for program version & description)
-     */
-    private readPackageJSON() {
-        try {
-            this.packageJSON = JSON.parse(fs.readFileSync("./package.json").toString());
-        } catch (e) {
-            console.error("error: ".red + "could not open package.json:", e.message);
-            process.exit(1);
+        if (!args.slice(2).length) {
+            commander.outputHelp();
         }
-    }
-
-    /**
-     * Loads config and validates fields
-     */
-    private async readConfig() {
-        return new Promise<boolean>(async (resolve, error) => {
-            try {
-                this.config = JSON.parse(fs.readFileSync("./config.json").toString());
-            } catch(e) {
-                this.config = {};
-            }
-
-            let errors:Array<string> = [];
-
-            if (!this.config.etdedPath || this.config.etdedPath.length === 0) {
-
-                errors.push("etded executable path is missing.");
-            }
-
-            if (!this.config.killPath || this.config.killPath.length === 0) {
-                errors.push("process kill command path is missing.");
-            }
-
-            if (!this.config.pgrepPath || this.config.pgrepPath.length === 0) {
-                errors.push("pgrep command path is missing");
-            }
-
-            if (!this.config.screenPath || this.config.screenPath.length === 0) {
-                errors.push("screen path is missing");
-            }
-
-            if (!this.config.suPath || this.config.suPath.length === 0) {
-                errors.push("su path is missing");
-            }
-
-            if (errors.length > 0) {
-                console.error("Error: ".red + "configuration file ./config.json does not exist or does not have all necessary configuration paths set. ");
-                errors.forEach((error, index) => {
-                    console.error(`#${index + 1} ${error}`.yellow);
-                });
-
-                let paths = Util.tryToGetExecPaths([
-                    "kill",
-                    "pgrep",
-                    "screen",
-                    "su"
-                ]);
-
-                let schema:prompt.Schema = {
-                    properties: {
-                        etdedPath: {
-                            description: "ETDED executable path",
-                            required: true,
-                            message: "file does not exist or is a directory.",
-                            conform: Util.fileExists
-                        },
-                        killPath: {
-                            default: paths["kill"] ? paths["kill"] : "",
-                            description: "kill executable path",
-                            required: true,
-                            conform: Util.fileExists
-                        },
-                        pgrepPath: {
-                            default: paths["pgrep"] ? paths["pgrep"] : "",
-                            description: "pgrep executable path",
-                            required: true,
-                            conform: Util.fileExists
-                        },
-                        screenPath: {
-                            default: paths["screen"] ? paths["screen"] : "",
-                            description: "screen executable path",
-                            required: true,
-                            conform: Util.fileExists
-                        },
-                        suPath: {
-                            default: paths["su"] ? paths["su"] : "",
-                            description: "su executable path",
-                            required: true,
-                            conform: Util.fileExists
-                        }
-                    }
-                };
-
-                prompt.start();
-                prompt.get(schema, (err, result) => {
-                    if (err) {
-                        console.error("error:".red, err);
-                        return resolve(false);
-                    }
-
-                    this.config.etdedPath = fs.realpathSync(result.etdedPath);
-                    this.config.killPath = fs.realpathSync(result.killPath);
-                    this.config.pgrepPath = fs.realpathSync(result.pgrepPath);
-                    this.config.screenPath = fs.realpathSync(result.screenPath);
-                    this.config.suPath = fs.realpathSync(result.suPath);
-
-                    fs.writeFileSync("config.json", JSON.stringify(this.config, null, 4));
-
-                    resolve(true);
-                });
-            }
-        });
     }
 
     /**
      * Tries to start the server.
      * @param serverName
      */
-    private async start(serverName: string) {
-        console.log("start:", serverName);
+    private start(serverName: string) {
+        let matchingServer = this.servers.filter((server) => {
+            return server.name === serverName;
+        });
+
+        if (matchingServer.length === 0) {
+            console.error("error: ".red + `could not find server ${serverName}.`);
+            return;
+        }
+        console.log(`Starting server: ${serverName}`);
+        let result = matchingServer[0].start(JSON.parse(fs.readFileSync("./config.json").toString()));
+        if (result.success) {
+            if (result.message.length > 0) {
+                console.log(result.message);
+            }
+        } else {
+            return console.error(result.message);
+        }
+
+        this.saveServer(matchingServer[0]);
+
+        return console.log(`Started server: ${serverName}`);
     }
+
 
     /**
      * Tries to stop the server.
      * @param serverName
      */
-    private async stop(serverName: string) {
-        console.log("stop:", serverName);
+    private stop(serverName: string) {
+        let matchingServer = this.servers.filter((server) => {
+            return server.name === serverName;
+        });
+
+        if (matchingServer.length === 0) {
+            return console.error("error".red + `could not find server ${serverName}.`);
+        }
+
+        let serverInfo = this.serversInformation.filter((info) => {
+            return info.name === serverName;
+        });
+        if (serverInfo.length === 0) {
+            return console.error("error: ".red + "could not find matching server from servers.json. This should not happen.");
+        }
+
+        console.log(`Stopping server: ${serverName}...`);
+
+        serverInfo[0].running = false;
+        serverInfo[0].pid = -1;
+
+        fs.writeFileSync("./servers.json", JSON.stringify(this.serversInformation, null, 4));
+
+        // wait some time before closing the server so that the looper will not try
+        // to restart it immediately before receiving updates through the file change
+        setTimeout(() => {
+            try {
+                matchingServer[0].stop();
+            } catch (e) {
+                return console.error("error:".red + e);
+            }
+            return console.log(`Successfully stopped server: ${serverName}`);
+        }, 1000);
+
+
+
+
     }
 
     /**
@@ -212,30 +168,62 @@ class Main {
      * @param serverName
      */
     private async restart(serverName: string) {
-        console.log("restart:", serverName);
+        let matchingServer = this.servers.filter((server) => {
+            return server.name === serverName;
+        });
 
+        if (matchingServer.length === 0) {
+            console.error("error".red + `could not find server ${serverName}.`);
+        }
+        console.log(`Restarting server: ${serverName}`);
+        try {
+            matchingServer[0].stop();
+        } catch (e) {
+            return console.error("error:".red + e);
+        }
+
+        try {
+            await matchingServer[0].start(JSON.parse(fs.readFileSync("./config.json").toString()));
+        } catch (e) {
+            return console.error(e);
+        }
+
+        let serverInfo = this.serversInformation.filter((info) => {
+            return info.name === serverName;
+        });
+        if (serverInfo.length === 0) {
+            return console.error("error: ".red + "could not find matching server from servers.json. This should not happen.");
+        }
+        serverInfo[0].pid = -1;
+
+        fs.writeFileSync("./servers.json", JSON.stringify(this.serversInformation, null, 4));
     }
 
     /**
      * Lists all servers and their statuses.
-     * @param serverName
      */
-    private async list(serverName: string) {
-        console.log("list:", serverName);
-
+    private async list() {
+        this.servers.forEach((server) => {
+            this.status(server.name);
+        });
     }
 
-    /**
-     * Prints the getstatus information in a cleaned up format.
-     * @param serverName
-     */
-    private async status(serverName: string) {
-        let server = new Server({ipAddress: "trickjump.net", port: 27960});
+    private async printStatus(server: Server) {
+        if (!server.running) {
+            console.log("==================================================");
+            console.log(`${server.name} is not running.`);
+            console.log("==================================================");
+            return
+        }
+
         let status: ServerStatus;
         try {
             status = await server.status()
         } catch (err) {
-            console.error("GetStatus error: ", err);
+            console.log("==================================================");
+            console.log(`${server.name} should be running but isn't.`);
+            console.log("==================================================");
+            return;
         }
         console.log("==================================================");
         console.log(` Server: ${Util.stripColors(status.keys["sv_hostname"])}`);
@@ -245,6 +233,24 @@ class Main {
             console.log(` - ${Util.stripColors(player)}`);
         });
         console.log("==================================================");
+    }
+
+    /**
+     * Prints the getstatus information in a cleaned up format.
+     * @param serverName
+     */
+    private async status(serverName: string) {
+        let matches = this.servers.filter((server) => {
+            return server.name === serverName;
+        });
+
+        if (matches.length === 0) {
+            console.error(`error: ".red + "no matching server with name ${serverName} was found`);
+            process.exit(0);
+        }
+        let server = matches[0];
+
+        this.printStatus(server);
     }
 
     /**
@@ -277,8 +283,14 @@ class Main {
                 },
                 user: {
                     required: true,
+                    message: "OS user must exist.",
                     conform: (value: string) => {
-                        // Test that the user exists
+                        let uid = Util.findUid(value);
+
+                        if (uid === -1) {
+                            return false;
+                        }
+
                         return true;
                     }
                 },
@@ -342,9 +354,8 @@ class Main {
                     }
                 },
                 customExecutable: {
-                    description: "A custom executable to run the server with.",
+                    description: "A custom executable to run the server with. Leave this empty if you wish to use the default executable.",
                     default: "",
-                    message: "Custom executable must exist.",
                     conform: Util.fileExists
                 }
             }
@@ -428,8 +439,204 @@ class Main {
         });
     }
 
-    testAction(arg: string) {
-        console.log(fs.realpathSync(arg));
+    /**
+     * When was the servers file last modified
+     * @type {Date}
+     */
+    private lastModificationTime = new Date();
+
+    /**
+     * Loops forever and checks that servers are running
+     */
+    private loop() {
+        const configFile = "./config.json";
+        const serversFile = "./servers.json";
+
+        fs.watchFile(configFile, () => {
+            this.config = this.readConfig(configFile);
+        });
+
+        let innerLoop = () => {
+            let stat = fs.statSync(serversFile);
+            if (this.lastModificationTime.getTime() !== stat.mtime.getTime()) {
+                this.lastModificationTime = stat.mtime;
+                this.serversInformation = this.readServersInformation(serversFile);
+                this.servers = this.parseServers(this.serversInformation);
+                console.log(new Date().toISOString(), "servers.config has changed.");
+            }
+
+            this.servers.forEach((server) => {
+                let result = server.check(this.config);
+                if (result.success) {
+                    if (result.message) {
+                        console.log(result.message);
+                    }
+                    if (result.restarted) {
+                        this.saveServer(server);
+                    }
+                } else  {
+                    console.error(result.message);
+                }
+            });
+
+            setTimeout(innerLoop, 2000);
+        };
+
+        innerLoop();
+    }
+
+    /**
+     * Saves the server to servers.json
+     * @param server
+     */
+    private saveServer(server: Server) {
+        let serverInfo = this.serversInformation.filter((info) => {
+            return info.name === server.name;
+        });
+        if (serverInfo.length === 0) {
+            return console.error("error: ".red + "could not find matching server from servers.json. This should not happen.");
+        }
+        serverInfo[0].pid = server.pid;
+        serverInfo[0].running = true;
+
+        fs.writeFileSync("./servers.json", JSON.stringify(this.serversInformation, null, 4));
+    }
+
+    /**
+     * Reads and stores the contents of package.json for later usage
+     * (mainly for program version & description)
+     */
+    private readPackageJSON(path: string) {
+        try {
+            this.packageJSON = JSON.parse(fs.readFileSync(path).toString());
+        } catch (e) {
+            console.error("error: ".red + "could not open package.json:", e.message);
+            process.exit(1);
+        }
+    }
+
+    private emptyConfig():Configuration {
+        return {etdedPath: undefined, killPath: undefined, pgrepPath: undefined, screenPath: undefined, suPath: undefined};
+    }
+
+    private readConfig(path: string): Configuration {
+        let config: Configuration;
+        try {
+            config = JSON.parse(fs.readFileSync(path).toString());
+        } catch (e) {
+            config = this.emptyConfig();
+        }
+
+        return config;
+    }
+
+    /**
+     * Loads config and validates fields
+     */
+    private async parseConfig(path: string) {
+        return new Promise<boolean>(async (resolve, error) => {
+            this.config = this.readConfig("./config.json");
+            let validationResult = Util.validateConfig(this.config);
+
+            if (validationResult.errors.length > 0) {
+                console.error("Error: ".red + "configuration file ./config.json does not exist or does not have all necessary values set. ");
+                validationResult.errors.forEach((error, index) => {
+                    console.error(`#${index + 1} ${error}`.yellow);
+                });
+
+                let paths = Util.tryToGetExecPaths([
+                    "etded",
+                    "kill",
+                    "pgrep",
+                    "screen",
+                    "su"
+                ]);
+
+                let schema:prompt.Schema = {
+                    properties: {
+                        etdedPath: {
+                            description: "ETDED executable path",
+                            default: paths["etded"] ? paths["etded"] : undefined,
+                            required: true,
+                            message: "file does not exist or is a directory.",
+                            conform: Util.fileExists
+                        },
+                        killPath: {
+                            default: paths["kill"] ? paths["kill"] : undefined,
+                            description: "kill executable path",
+                            required: true,
+                            conform: Util.fileExists
+                        },
+                        pgrepPath: {
+                            default: paths["pgrep"] ? paths["pgrep"] : undefined,
+                            description: "pgrep executable path",
+                            required: true,
+                            conform: Util.fileExists
+                        },
+                        screenPath: {
+                            default: paths["screen"] ? paths["screen"] : undefined,
+                            description: "screen executable path",
+                            required: true,
+                            conform: Util.fileExists
+                        },
+                        suPath: {
+                            default: paths["su"] ? paths["su"] : undefined,
+                            description: "su executable path",
+                            required: true,
+                            conform: Util.fileExists
+                        }
+                    }
+                };
+
+                prompt.start();
+                prompt.get(schema, (err, result) => {
+                    if (err) {
+                        console.error("error:".red, err);
+                        return resolve(false);
+                    }
+
+                    this.config.etdedPath = fs.realpathSync(result.etdedPath);
+                    this.config.killPath = fs.realpathSync(result.killPath);
+                    this.config.pgrepPath = fs.realpathSync(result.pgrepPath);
+                    this.config.screenPath = fs.realpathSync(result.screenPath);
+                    this.config.suPath = fs.realpathSync(result.suPath);
+
+                    fs.writeFileSync("config.json", JSON.stringify(this.config, null, 4));
+
+                    return resolve(true);
+                });
+            }
+
+            return resolve(true);
+        });
+    }
+
+    /**
+     * Reads the servers.json and returns the data
+     * @param path
+     * @returns {Array<ServerInformation>}
+     */
+    private readServersInformation(path: string): Array<ServerInformation> {
+        let serversInformation: Array<ServerInformation>;
+        try {
+            serversInformation = JSON.parse(fs.readFileSync(path).toString());
+        } catch (e) {
+            serversInformation = [];
+        }
+        return serversInformation;
+    }
+
+    /**
+     * Parses the servers information into server objects
+     * @param serversInformation
+     * @returns {Array<Server>}
+     */
+    private parseServers(serversInformation: Array<ServerInformation>) {
+        let servers: Array<Server> = [];
+        this.serversInformation.forEach((server) => {
+            servers.push(new Server(server, {}));
+        });
+        return servers;
     }
 }
 

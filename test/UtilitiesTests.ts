@@ -10,6 +10,7 @@ import {validateIPAdress} from "../Utilities";
 import {validatePort} from "../Utilities";
 import {validateMod} from "../Utilities";
 import {fileExists} from "../Utilities";
+import {findUid} from "../Utilities";
 
 describe("stripColors", () => {
    it("should return an empty string if it only has color codes", () => {
@@ -137,5 +138,11 @@ describe("fileExists", () => {
 
     it("should fail with an invalid file", () => {
         assert.equal(fileExists("does-not-exist.txt"), false);
+    });
+});
+
+describe("findUid", () => {
+    it("should not fail with root id", () => {
+        assert.equal(findUid("root"), 0);
     });
 });
