@@ -201,7 +201,7 @@ class Server {
             "+map oasis"
         ];
         this.configs.forEach((config) => {
-            parameters.push(`exec "${config}"`);
+            parameters.push(`+exec "${config}"`);
         });
         parameters.push(`+set fs_game "${this.mod}"`);
         parameters.push(`+set com_hunkmegs "128"`);

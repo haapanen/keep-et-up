@@ -250,7 +250,7 @@ export class Server implements ServerInformation {
         ];
 
         this.configs.forEach((config) => {
-            parameters.push(`exec "${config}"`);
+            parameters.push(`+exec "${config}"`);
         });
 
         parameters.push(`+set fs_game "${this.mod}"`);
