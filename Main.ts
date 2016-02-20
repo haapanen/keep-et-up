@@ -39,11 +39,10 @@ class Main {
 
     private async init(args) {
         this.readPackageJSON("./package.json");
-        let readConfigResult = await this.readConfig("./config.json");
+        let readConfigResult = await this.parseConfig("./config.json");
         if (!readConfigResult) {
             process.exit(1);
         }
-        this.config = readConfigResult;
         this.serversInformation = this.readServersInformation("./servers.json");
         this.servers = this.parseServers(this.serversInformation);
 
@@ -535,7 +534,7 @@ class Main {
      */
     private async parseConfig(path: string) {
         return new Promise<boolean>(async (resolve, error) => {
-            this.config = this.readConfig("./config.json");
+            this.config = this.readConfig(path);
             let validationResult = Util.validateConfig(this.config);
 
             if (validationResult.errors.length > 0) {

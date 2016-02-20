@@ -31,11 +31,10 @@ class Main {
     init(args) {
         return __awaiter(this, void 0, void 0, function* () {
             this.readPackageJSON("./package.json");
-            let readConfigResult = yield this.readConfig("./config.json");
+            let readConfigResult = yield this.parseConfig("./config.json");
             if (!readConfigResult) {
                 process.exit(1);
             }
-            this.config = readConfigResult;
             this.serversInformation = this.readServersInformation("./servers.json");
             this.servers = this.parseServers(this.serversInformation);
             commander
@@ -485,7 +484,7 @@ class Main {
     parseConfig(path) {
         return __awaiter(this, void 0, void 0, function* () {
             return new Promise((resolve, error) => __awaiter(this, void 0, void 0, function* () {
-                this.config = this.readConfig("./config.json");
+                this.config = this.readConfig(path);
                 let validationResult = Util.validateConfig(this.config);
                 if (validationResult.errors.length > 0) {
                     console.error("Error: ".red + "configuration file ./config.json does not exist or does not have all necessary values set. ");
