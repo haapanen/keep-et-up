@@ -1,0 +1,7 @@
+.idea
+.vagrant
+node_modules
+*.js
+*.js.map
+logs/
+config.json

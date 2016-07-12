@@ -1,0 +1,40 @@
+{
+  "name": "keep-et-up",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "node_modules/mocha/bin/mocha --require ts-node/register **/*Tests.ts",
+    "service": "node service/service",
+    "client": "node client/client"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/haapanen/keep-et-up.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/haapanen/keep-et-up/issues"
+  },
+  "homepage": "https://github.com/haapanen/keep-et-up#readme",
+  "devDependencies": {
+    "@types/chai": "^3.4.27-alpha",
+    "@types/lodash": "0.0.26-alpha",
+    "@types/mocha": "^2.2.26-alpha",
+    "@types/node": "^4.0.27-alpha",
+    "@types/node-uuid": "0.0.26-alpha",
+    "@types/winston": "0.0.26-alpha",
+    "@types/zmq": "0.0.15-alpha",
+    "chai": "^3.5.0",
+    "mocha": "^2.5.3",
+    "ts-node": "^0.9.3",
+    "typescript": "^2.0.0"
+  },
+  "dependencies": {
+    "lodash": "^4.13.1",
+    "node-uuid": "^1.4.7",
+    "winston": "^2.2.0",
+    "zmq": "^2.15.3"
+  }
+}
