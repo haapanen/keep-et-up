@@ -4,7 +4,6 @@ export enum ResponseStatus {
 }
 
 export interface Response {
-    readonly id: string;
     readonly status: ResponseStatus;
     readonly message: string;
 }

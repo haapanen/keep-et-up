@@ -6,7 +6,7 @@ import { expect } from "chai";
 import {OsUtilities} from "../../../lib/utilities/osUtilities";
 
 describe("OsUtilities", () => {
-    describe("fileExists", () => {
+    describe("fileExistsSync", () => {
         const exampleFile = "example_file_1.txt";
 
         beforeEach(() => {
@@ -18,21 +18,40 @@ describe("OsUtilities", () => {
         });
 
         it("should find a valid file", () => {
-            expect(OsUtilities.fileExists(exampleFile)).to.be.ok;
+            expect(OsUtilities.fileExistsSync(exampleFile)).to.be.ok;
         });
 
         it("should fail on invalid file", () => {
-            expect(OsUtilities.fileExists(exampleFile + "foobar")).not.to.be.ok;
+            expect(OsUtilities.fileExistsSync(exampleFile + "foobar")).not.to.be.ok;
         });
     });
 
-    describe("userExists", () => {
+    describe("userExistsSync", () => {
         it("should find an existing user.", () => {
-            expect(OsUtilities.userExists("root")).to.be.ok;
+            expect(OsUtilities.userExistsSync("root")).to.be.ok;
         });
 
         it("should not find a non existing user", () => {
-            expect(OsUtilities.userExists("thisuserdoesnotexist")).not.to.be.undefined;
+            expect(OsUtilities.userExistsSync("thisuserdoesnotexist")).not.to.be.undefined;
+        });
+    });
+
+    describe("dirExists", () => {
+        it("should find an existing dir", async () => {
+            const dir = "./test_directory_1";
+            fs.mkdirSync(dir);
+            expect(await OsUtilities.dirExists(dir)).to.be.ok;
+            fs.rmdirSync(dir);
+        });
+
+        it("should not find a non existing dir", async () => {
+            expect(await OsUtilities.dirExists("./no_such_dir_exists")).not.to.be.ok;
+        });
+
+        it("should not find an undefined dir", async() => {
+            expect(await OsUtilities.dirExists(undefined as any)).not.to.be.ok;
+            expect(await OsUtilities.dirExists(null as any)).not.to.be.ok;
+            expect(await OsUtilities.dirExists("")).not.to.be.ok;
         });
     });
 });

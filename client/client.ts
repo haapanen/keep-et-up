@@ -3,6 +3,7 @@ import * as _ from "lodash";
 import * as uuid from "node-uuid";
 import {MessageType} from "../lib/messages/message";
 import {CommandType} from "../lib/messages/commands/command";
+import {Server} from "../service/bll/server";
 
 export class Client {
     private socket: zmq.Socket;
@@ -28,14 +29,45 @@ export class Client {
 
         this.socket.connect("tcp://localhost:42424");
 
-        this.send("out");
-        this.send({ foo: "bar" });
+        // this.socket.send("foobar");
+        // this.send("out");
+        // this.send({ foo: "bar" });
+        // this.send({
+        //     type: MessageType.Command,
+        //     payload: {
+        //         type: CommandType.StartServer,
+        //         name: "Server1"
+        //     }
+        // });
+        // this.send({
+        //     type: MessageType.Command,
+        //     payload: {
+        //         type: CommandType.RestartServer,
+        //         name: "Server1"
+        //     }
+        // });
+        // this.send({
+        //     type: MessageType.Command,
+        //     payload: {
+        //         type: CommandType.StopServer,
+        //         name: "Server1"
+        //     }
+        // });
         this.send({
             type: MessageType.Command,
             payload: {
-                type: CommandType.StartServer
+                type: CommandType.AddServer,
+                server: {
+                    name: "Server4",
+                    port: 27961,
+                    basepath: "/usr/local/share/et/",
+                    homepath: "/home/et/Server1/",
+                    mod: "etjump",
+                    user: "et",
+                    configs: ["server.cfg"]
+                } as Server
             }
-        });
+        })
     }
 
     private send(object: any) {

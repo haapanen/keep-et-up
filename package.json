@@ -6,6 +6,7 @@
   "scripts": {
     "test": "node_modules/mocha/bin/mocha --require ts-node/register **/*Tests.ts",
     "service": "node service/service",
+    "dservice": "node --debug-brk=9999 service/service",
     "client": "node client/client"
   },
   "repository": {

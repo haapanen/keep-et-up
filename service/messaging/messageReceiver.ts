@@ -27,23 +27,11 @@ export class MessageReceiver {
      */
     start() {
         this.socket.on("message", async (request) => {
+            let message: any;
+
             try {
                 // try to parse the message
-                let message = JSON.parse(request.toString());
-
-                // try to handle the message
-                let result = await this.options.messageHandler.messageReceived(message);
-
-                if (result.status === ResponseStatus.Failure) {
-                    winston.info("Failed request: " + JSON.stringify(message, null, 4));
-                }
-
-                // send result back to the client
-                return this.socket.send(JSON.stringify({
-                    id: message.id,
-                    success: result.status === ResponseStatus.Success,
-                    message: result.message
-                }));
+                message = JSON.parse(request.toString());
             } catch (exception) {
                 winston.info(`Invalid request: "${request}"`);
                 // invalid request
@@ -53,6 +41,30 @@ export class MessageReceiver {
                     message: "Message is not valid JSON."
                 }));
             }
+
+            // if there's no id, it's an invalid msg
+            if (!message.id) {
+                return this.socket.send(JSON.stringify({
+                    success: false,
+                    message: "Each message must have a unique id."
+                }));
+            }
+
+            // try to handle the message
+            let result = await this.options.messageHandler.messageReceived(message);
+
+            if (result.status === ResponseStatus.Failure) {
+                winston.info("Failed request: " + JSON.stringify(message, null, 4));
+            } else {
+                winston.info("Successful request: " + JSON.stringify(message, null, 4));
+            }
+
+            // send result back to the client
+            return this.socket.send(JSON.stringify({
+                id: message.id,
+                success: result.status === ResponseStatus.Success,
+                message: result.message
+            }));
         });
 
         winston.debug(`Listening to: ${this.options.address}`);

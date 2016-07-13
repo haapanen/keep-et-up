@@ -8,6 +8,7 @@ import {RestartServerCommand} from "../../lib/messages/commands/restartServerCom
 import {AddServerCommand} from "../../lib/messages/commands/addServerCommand";
 import {EditServerCommand} from "../../lib/messages/commands/editServerCommand";
 import {DeleteServerCommand} from "../../lib/messages/commands/deleteServerCommand";
+import * as winston from "winston";
 export interface MessageHandlerOptions {
     readonly serverCoordinator: {
         startServer: (command: StartServerCommand) => Promise<Response>;
@@ -30,25 +31,35 @@ export class MessageHandler {
      * @returns {any}
      */
     messageReceived(message: any): Promise<Response> {
-        return new Promise<Response>(resolve => {
-            if (message.id === undefined || message.id === null) {
-                return resolve(this.failedOperationResponse("Message id must be specified."));
-            }
+        return new Promise<Response>((resolve, reject) => {
+            try {
+                if (message.id === undefined || message.id === null) {
+                    return resolve(this.failedOperationResponse("Message id must be specified."));
+                }
 
-            if (isNaN(message.type)
-                || message.type < 0
-                || message.type >= MessageType.NumMessageTypes) {
-                return resolve(this.failedOperationResponse(`Message type must be specified and be between 0 and ${MessageType.NumMessageTypes}.`));
-            }
+                if (isNaN(message.type)
+                    || message.type < 0
+                    || message.type >= MessageType.NumMessageTypes) {
+                    return resolve(this.failedOperationResponse(`Message type must be specified and be between 0 and ${MessageType.NumMessageTypes}.`));
+                }
 
-            switch ((message as Message).type) {
-                case MessageType.Command:
-                    return resolve(this.handleCommand(message.payload));
-                case MessageType.Query:
-                    return resolve(this.handleQuery(message.payload));
-            }
+                try {
+                    switch ((message as Message).type) {
+                        case MessageType.Command:
+                            return resolve(this.handleCommand(message.payload));
+                        case MessageType.Query:
+                            return resolve(this.handleQuery(message.payload));
+                    }
+                } catch (exception) {
+                    winston.error(exception.message);
+                    return resolve(this.failedOperationResponse(`Internal service error.`));
+                }
 
-            return resolve(this.failedOperationResponse(`Invalid message type: ${message.type}.`));
+
+                return resolve(this.failedOperationResponse(`Invalid message type: ${message.type}.`));
+            } catch (ex) {
+                return reject(ex);
+            }
         });
     }
 
@@ -70,32 +81,41 @@ export class MessageHandler {
      * @returns {Response}
      */
     private handleCommand(payload:any): Promise<Response> {
-        return new Promise<Response>(resolve => {
-            if (payload === undefined || payload === null) {
-                return resolve(this.failedOperationResponse("Command payload must be specified."));
-            }
+        return new Promise<Response>(async (resolve, reject) => {
+            try {
+                if (payload === undefined || payload === null) {
+                    return resolve(this.failedOperationResponse("Command payload must be specified."));
+                }
 
-            if (isNaN(payload.type) || payload.type < 0 || payload.type >= CommandType.NumCommandTypes) {
-                return resolve(this.failedOperationResponse(`Invalid command type: ${CommandType[payload.type]} (${payload.type}).`));
-            }
+                if (isNaN(payload.type) || payload.type < 0 || payload.type >= CommandType.NumCommandTypes) {
+                    return resolve(this.failedOperationResponse(`Invalid command type: ${CommandType[payload.type]} (${payload.type}).`));
+                }
 
-            switch ((payload as Command).type) {
-                case CommandType.AddServer:
-                    return resolve(this.options.serverCoordinator.addServer(payload));
-                case CommandType.DeleteServer:
-                    return resolve(this.options.serverCoordinator.deleteServer(payload));
-                case CommandType.EditServer:
-                    return resolve(this.options.serverCoordinator.editServer(payload));
-                case CommandType.RestartServer:
-                    return resolve(this.options.serverCoordinator.restartServer(payload));
-                case CommandType.StartServer:
-                    return resolve(this.options.serverCoordinator.startServer(payload));
-                case CommandType.StopServer:
-                    return resolve(this.options.serverCoordinator.stopServer(payload));
-                default:
-                    return resolve(this.failedOperationResponse(`Command: ${CommandType[payload.type]} (${payload.type}) is not implemented.`));
-            }
+                try {
+                    switch ((payload as Command).type) {
+                        case CommandType.AddServer:
+                            return resolve(await this.options.serverCoordinator.addServer(payload));
+                        case CommandType.DeleteServer:
+                            return resolve(await this.options.serverCoordinator.deleteServer(payload));
+                        case CommandType.EditServer:
+                            return resolve(await this.options.serverCoordinator.editServer(payload));
+                        case CommandType.RestartServer:
+                            return resolve(await this.options.serverCoordinator.restartServer(payload));
+                        case CommandType.StartServer:
+                            return resolve(await this.options.serverCoordinator.startServer(payload));
+                        case CommandType.StopServer:
+                            return resolve(await this.options.serverCoordinator.stopServer(payload));
+                        default:
+                            return resolve(this.failedOperationResponse(`Command: ${CommandType[payload.type]} (${payload.type}) is not implemented.`));
+                    }
+                } catch (exception) {
+                    winston.error(exception.message);
 
+                    return resolve(this.failedOperationResponse(`Internal server error.`));
+                }
+            } catch (ex) {
+                return reject(ex);
+            }
         });
     }
 
@@ -105,16 +125,20 @@ export class MessageHandler {
      * @returns {Response}
      */
     private handleQuery(payload:any): Promise<Response> {
-        return new Promise<Response>(resolve => {
-            if (payload === undefined || payload === null) {
-                return resolve(this.failedOperationResponse("Query payload must be specified."));
-            }
+        return new Promise<Response>((resolve, reject) => {
+            try {
+                if (payload === undefined || payload === null) {
+                    return resolve(this.failedOperationResponse("Query payload must be specified."));
+                }
 
-            if (isNaN(payload.type) || payload.type < 0 || payload.type >= QueryType.NumQueryTypes) {
-                return resolve(this.failedOperationResponse(`Invalid query type: ${QueryType[payload.type]} (${payload.type}).`));
-            }
+                if (isNaN(payload.type) || payload.type < 0 || payload.type >= QueryType.NumQueryTypes) {
+                    return resolve(this.failedOperationResponse(`Invalid query type: ${QueryType[payload.type]} (${payload.type}).`));
+                }
 
-            return resolve(this.failedOperationResponse(`Query: ${QueryType[payload.type]} (${payload.type}) is not implemented.`));
+                return resolve(this.failedOperationResponse(`Query: ${QueryType[payload.type]} (${payload.type}) is not implemented.`));
+            } catch (ex) {
+                return reject(ex);
+            }
         });
     }
 }
