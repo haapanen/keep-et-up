@@ -1,4 +1,5 @@
 import {Server} from "../../../service/bll/server";
-export interface AddServerCommand {
+import {Command} from "./command";
+export interface AddServerCommand extends Command {
     server: Server;
 }

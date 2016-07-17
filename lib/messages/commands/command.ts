@@ -10,5 +10,4 @@ export enum CommandType {
 
 export interface Command {
     readonly type:CommandType;
-    readonly payload:any;
 }
