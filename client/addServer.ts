@@ -7,8 +7,8 @@ import {Response, ResponseStatus} from "../lib/messages/response";
 import {Client} from "./client";
 
 export class AddServerCommandImplementation extends Client {
-    constructor() {
-        super("tcp://localhost:42424", (response: Response) => {
+    constructor(address: string) {
+        super(address, (response: Response) => {
             if (response.status === ResponseStatus.Failure) {
                 console.log(`Could not add server: ${response.message}`);
             } else {
@@ -54,5 +54,5 @@ export class AddServerCommandImplementation extends Client {
     }
 }
 
-const command = new AddServerCommandImplementation();
+const command = new AddServerCommandImplementation("tcp://localhost:42424");
 command.run();

@@ -1,4 +1,5 @@
-export interface StartServerCommand {
+import {Command} from "./command";
+export interface StartServerCommand extends Command {
     /**
      * Name of the server to start
      */
