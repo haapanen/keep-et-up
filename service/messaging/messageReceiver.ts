@@ -54,7 +54,7 @@ export class MessageReceiver {
             let result = await this.options.messageHandler.messageReceived(message);
 
             if (result.status === ResponseStatus.Failure) {
-                winston.info("Failed request: " + JSON.stringify(message, null, 4));
+                winston.info(`Failed request: (${result.message}) ${JSON.stringify(message, null, 4)}`);
             } else {
                 winston.info("Successful request: " + JSON.stringify(message, null, 4));
             }

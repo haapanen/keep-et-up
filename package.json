@@ -29,6 +29,7 @@
     "@types/zmq": "0.0.15-alpha",
     "chai": "^3.5.0",
     "mocha": "^2.5.3",
+    "node-gyp": "^3.4.0",
     "ts-node": "^0.9.3",
     "typescript": "^2.0.0"
   },

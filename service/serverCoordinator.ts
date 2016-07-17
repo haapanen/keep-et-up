@@ -31,6 +31,7 @@ export interface ServerCoordinatorOptions {
  */
 interface ManagedServer extends Server {
     pid: number;
+    restartAttempts: number;
 }
 
 enum ValidationStatus {
@@ -47,6 +48,7 @@ const NotRunning = -1;
 
 export class ServerCoordinator {
     private servers: ManagedServer[] = [];
+    private watcherTimer: NodeJS.Timer;
 
     constructor(private options: ServerCoordinatorOptions) {
         let contents: string;
@@ -59,11 +61,13 @@ export class ServerCoordinator {
                 winston.error("servers.json contains invalid JSON.");
                 process.exit(1);
             }
+
+            this.initWatcher();
         } catch (ex) {}
     }
 
     startServer(payload: StartServerCommand | any): Promise<Response> {
-        return new Promise<Response>((resolve, reject) => {
+        return new Promise<Response>(async (resolve, reject) => {
             try {
                 winston.debug("Start server payload:", JSON.stringify(payload, null, 4));
 
@@ -71,9 +75,16 @@ export class ServerCoordinator {
                     return resolve(this.failedOperationResponse("Server name must be specified."));
                 }
 
-                let command = payload as StartServerCommand;
+                let server = this.findServer(payload.name);
+                if (server === undefined) {
+                    return resolve(this.failedOperationResponse(`Server ${payload.name} does not exist.`));
+                }
 
-                return resolve(this.successfulOperationResponse(`Started server: ${command.name}`));
+                if (server.pid > NotRunning && OsUtilities.isRunning(server.pid)) {
+                    return resolve(this.failedOperationResponse(`Server ${payload.name} is already running.`));
+                }
+
+                return resolve(await this.startServerProcess(server));
             } catch (ex) {
                 return reject(ex);
             }
@@ -81,7 +92,7 @@ export class ServerCoordinator {
     }
 
     stopServer(payload: StopServerCommand | any): Promise<Response> {
-        return new Promise<Response>((resolve, reject) => {
+        return new Promise<Response>(async (resolve, reject) => {
             try {
                 winston.debug("Stop server payload:", JSON.stringify(payload, null, 4));
 
@@ -89,9 +100,49 @@ export class ServerCoordinator {
                     return resolve(this.failedOperationResponse("Server name must be specified."));
                 }
 
-                let command = payload as StopServerCommand;
+                let server = this.findServer(payload.name);
+                if (server === undefined) {
+                    return resolve(this.failedOperationResponse(`Server ${payload.name} does not exist.`));
+                }
 
-                return resolve(this.successfulOperationResponse(`Stopped server: ${command.name}`));
+                if (server.pid === NotRunning) {
+                    return resolve(this.failedOperationResponse(`Server ${payload.name} is not running.`));
+                }
+
+                let command = payload as StopServerCommand;
+                if (OsUtilities.isRunning(server.pid)) {
+                    const screen = this.options.paths.screen;
+                    const args = ["-S", `${server.name}${server.port}`, "-X", "stuff", `"quit\r"`];
+
+                    let user = await OsUtilities.findUser(server.user);
+                    if (user === undefined || user === null) {
+                        return resolve(this.failedOperationResponse(`Could not find user: ${server.user}.`));
+                    }
+
+                    // for some reason TS compiler thinks this might be undefined
+                    // on the callback.
+                    let targetServer = server;
+                    childProcess.execFile(screen, args, {
+                        uid: user.userId,
+                        cwd: server.basepath,
+                        // we need to set the HOME env variable as ET uses it to store some data to
+                        // .etwolf directory. If this is not set, it will try to save it to /root/.etwolf
+                        // as another user and fail
+                        env: [{"HOME": `/home/${server.user}/`}]
+                    }, (error) => {
+                        if (error) {
+                            winston.error(error.message);
+                            return resolve(this.failedOperationResponse(`Could not stop server: ${command.name}.`));
+                        }
+
+                        targetServer.pid = NotRunning;
+                        this.saveServers();
+
+                        return resolve(this.successfulOperationResponse(`Stopped server: ${command.name}`));
+                    });
+                } else {
+                    server.pid = NotRunning;
+                }
             } catch (ex) {
                 return reject(ex);
             }
@@ -126,7 +177,7 @@ export class ServerCoordinator {
                     return resolve(this.failedOperationResponse(validationMessage));
                 }
 
-                this.servers.push(_.extend({}, payload.server, { pid: NotRunning }) as any);
+                this.servers.push(_.extend({}, payload.server, { pid: NotRunning, restartAttempts: 0 }) as any);
 
                 winston.debug("Saving servers");
                 await this.saveServers();
@@ -255,5 +306,103 @@ export class ServerCoordinator {
                 return reject(ex);
             }
         });
+    }
+
+    private validateStartServerPayload(payload:StartServerCommand|any) {
+
+    }
+
+    private findServer(name: string): ManagedServer | undefined {
+        let match = this.servers.filter(s => s.name === name);
+        if (match.length === 0) {
+            return undefined;
+        }
+        return match[0];
+    }
+
+    /**
+     * Creates a list of "+exec config.cfg +exec config2.cfg" args from configs
+     * @param configs
+     * @returns {string[]}
+     */
+    private createConfigArgs(configs:string[]) {
+        let configArgs: string[] = [];
+        configs.forEach(c => {
+            configArgs.push("+exec");
+            configArgs.push(c);
+        });
+        return configArgs;
+    }
+
+    /**
+     * Watches the servers and restarts them if they go down
+     */
+    private initWatcher() {
+        this.watcherTimer = setInterval(() => {
+            this.servers.filter(s => s.pid !== NotRunning)
+                .forEach(async (server) => {
+                    if (!OsUtilities.isRunning(server.pid) && server.restartAttempts < 5) {
+                        winston.info(`Server ${server.name} should be running. Restarting (previous attempts: ${server.restartAttempts}).`);
+                        let result = await this.startServerProcess(server);
+                        if (result.status === ResponseStatus.Failure) {
+                            winston.error(`Could not restart server: ${server.name}. ${result.message}.`);
+                            server.restartAttempts++;
+                            this.saveServers();
+                        } else {
+                            server.restartAttempts = 0;
+                        }
+                    }
+                });
+        }, 1000);
+    }
+
+    private startServerProcess(server:ManagedServer): Promise<Response> {
+        return new Promise<Response>(async (resolve, reject) => {
+            // default or custom ET
+            let etPath = server.customExecutable
+                ? server.customExecutable
+                : this.options.paths.etded;
+
+            const screenArgs = ["-dmS", server.name + server.port];
+            const configArgs = this.createConfigArgs(server.configs);
+            const defaultMapArgs = ["+map", "oasis"];
+            const hunkMegs = ["+set com_hunkmegs", "128"];
+            const portArgs = ["+set net_port", "" + server.port];
+            const ipArgs = server.address ? ["+set net_ip", server.address] : [];
+            const pathArgs = ["+set fs_basepath", server.basepath, "+set fs_homepath", server.homepath];
+            const modArgs = ["+set fs_game", server.mod];
+            const etdedArgs = [etPath, ...hunkMegs, ...defaultMapArgs, ...modArgs,
+                ...configArgs, ...portArgs, ...ipArgs, ...pathArgs];
+
+            winston.debug([this.options.paths.screen, ...screenArgs, ...etdedArgs].join(" "));
+
+            let user = await OsUtilities.findUser(server.user);
+            if (!user) {
+                return resolve(this.failedOperationResponse(`User ${server.user} does not exist. Cannot start server.`));
+            }
+
+            let proc = childProcess.spawn(this.options.paths.screen, [...screenArgs, ...etdedArgs], {
+                uid: user.userId,
+                cwd: server.basepath,
+                detached: true,
+                // we need to set the HOME env variable as ET uses it to store some data to
+                // .etwolf directory. If this is not set, it will try to save it to /root/.etwolf
+                // as another user and fail
+                env: [{"HOME": `/home/${server.user}/`}]
+            });
+
+            proc.stderr.on("data", (data: Buffer) => {
+                winston.error("Screen process error: " + data.toString());
+            });
+            proc.on("close", (code: string) => {
+                winston.debug(`Child process exited with code ${code}`);
+            });
+
+            // screen pid + 1
+            server.pid = proc.pid + 1;
+            this.saveServers();
+            return resolve(this.successfulOperationResponse(`Started server: ${server.name}`));
+        });
+
     }
 }

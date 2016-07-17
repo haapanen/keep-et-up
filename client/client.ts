@@ -53,21 +53,35 @@ export class Client {
         //         name: "Server1"
         //     }
         // });
+        // this.send({
+        //     type: MessageType.Command,
+        //     payload: {
+        //         type: CommandType.AddServer,
+        //         server: {
+        //             name: "Server1",
+        //             port: 27960,
+        //             basepath: "/usr/local/games/enemy-territory/",
+        //             homepath: "/home/manager/Server1/",
+        //             mod: "etjump",
+        //             user: "et",
+        //             configs: ["server.cfg"]
+        //         } as Server
+        //     }
+        // });
         this.send({
             type: MessageType.Command,
             payload: {
-                type: CommandType.AddServer,
-                server: {
-                    name: "Server4",
-                    port: 27961,
-                    basepath: "/usr/local/share/et/",
-                    homepath: "/home/et/Server1/",
-                    mod: "etjump",
-                    user: "et",
-                    configs: ["server.cfg"]
-                } as Server
+                type: CommandType.StartServer,
+                name: "Server1"
             }
-        })
+        });
+        // this.send({
+        //     type: MessageType.Command,
+        //     payload: {
+        //         type: CommandType.StopServer,
+        //         name: "Server1"
+        //     }
+        // });
     }
 
     private send(object: any) {
