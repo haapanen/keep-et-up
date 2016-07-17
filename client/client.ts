@@ -55,7 +55,8 @@ export class Client {
      * @param message
      */
     send(message: Message) {
-        this.sentMessages.push(_.extend(message, { acked: false }));
+        (message as SentMessage).acked = false;
+        this.sentMessages.push(message as SentMessage);
         this.socket.send(JSON.stringify(message, null, 4));
     }
 

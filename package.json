@@ -7,7 +7,8 @@
     "test": "node_modules/mocha/bin/mocha --require ts-node/register **/*Tests.ts",
     "service": "node service/service",
     "dservice": "node --debug-brk=9999 service/service",
-    "client": "node client/client"
+    "client": "node client/client",
+    "postinstall": "./node_modules/typescript/bin/tsc"
   },
   "repository": {
     "type": "git",
