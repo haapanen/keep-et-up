@@ -376,50 +376,54 @@ export class ServerCoordinator {
 
     private startServerProcess(server:ManagedServer): Promise<Response> {
         return new Promise<Response>(async (resolve, reject) => {
-            // default or custom ET
-            let etPath = server.customExecutable
-                ? server.customExecutable
-                : this.options.paths.etded;
+            try {
+                // default or custom ET
+                let etPath = server.customExecutable
+                    ? server.customExecutable
+                    : this.options.paths.etded;
 
-            const screenArgs = ["-dmS", server.name + server.port];
-            const configArgs = this.createConfigArgs(server.configs);
-            const defaultMapArgs = ["+map", "oasis"];
-            const hunkMegs = ["+set com_hunkmegs", "128"];
-            const portArgs = ["+set net_port", "" + server.port];
-            const ipArgs = server.address ? ["+set net_ip", server.address] : [];
-            const pathArgs = ["+set fs_basepath", server.basepath, "+set fs_homepath", server.homepath];
-            const modArgs = ["+set fs_game", server.mod];
-            const etdedArgs = [etPath, ...hunkMegs, ...defaultMapArgs, ...modArgs,
-                ...configArgs, ...portArgs, ...ipArgs, ...pathArgs];
+                const screenArgs = ["-dmS", server.name + server.port];
+                const configArgs = this.createConfigArgs(server.configs);
+                const defaultMapArgs = ["+map", "oasis"];
+                const hunkMegs = ["+set com_hunkmegs", "128"];
+                const portArgs = ["+set net_port", "" + server.port];
+                const ipArgs = server.address ? ["+set net_ip", server.address] : [];
+                const pathArgs = ["+set fs_basepath", server.basepath, "+set fs_homepath", server.homepath];
+                const modArgs = ["+set fs_game", server.mod];
+                const etdedArgs = [etPath, ...hunkMegs, ...defaultMapArgs, ...modArgs,
+                    ...configArgs, ...portArgs, ...ipArgs, ...pathArgs];
 
-            winston.debug([this.options.paths.screen, ...screenArgs, ...etdedArgs].join(" "));
+                winston.debug([this.options.paths.screen, ...screenArgs, ...etdedArgs].join(" "));
 
-            let user = await OsUtilities.findUser(server.user);
-            if (!user) {
-                return resolve(this.failedOperationResponse(`User ${server.user} does not exist. Cannot start server.`));
+                let user = await OsUtilities.findUser(server.user);
+                if (!user) {
+                    return resolve(this.failedOperationResponse(`User ${server.user} does not exist. Cannot start server.`));
+                }
+
+                let proc = childProcess.spawn(this.options.paths.screen, [...screenArgs, ...etdedArgs], {
+                    uid: user.userId,
+                    cwd: server.basepath,
+                    detached: true,
+                    // we need to set the HOME env variable as ET uses it to store some data to
+                    // .etwolf directory. If this is not set, it will try to save it to /root/.etwolf
+                    // as another user and fail
+                    env: [{"HOME": `/home/${server.user}/`}]
+                });
+
+                proc.stderr.on("data", (data: Buffer) => {
+                    winston.error("Screen process error: " + data.toString());
+                });
+                proc.on("close", (code: string) => {
+                    winston.debug(`Child process exited with code ${code}`);
+                });
+
+                // screen pid + 1
+                server.pid = proc.pid + 1;
+                this.saveServers();
+                return resolve(this.successfulOperationResponse(`Started server: ${server.name}`));
+            } catch (exception) {
+                return reject(exception);
             }
-
-            let proc = childProcess.spawn(this.options.paths.screen, [...screenArgs, ...etdedArgs], {
-                uid: user.userId,
-                cwd: server.basepath,
-                detached: true,
-                // we need to set the HOME env variable as ET uses it to store some data to
-                // .etwolf directory. If this is not set, it will try to save it to /root/.etwolf
-                // as another user and fail
-                env: [{"HOME": `/home/${server.user}/`}]
-            });
-
-            proc.stderr.on("data", (data: Buffer) => {
-                winston.error("Screen process error: " + data.toString());
-            });
-            proc.on("close", (code: string) => {
-                winston.debug(`Child process exited with code ${code}`);
-            });
-
-            // screen pid + 1
-            server.pid = proc.pid + 1;
-            this.saveServers();
-            return resolve(this.successfulOperationResponse(`Started server: ${server.name}`));
         });
 
     }
