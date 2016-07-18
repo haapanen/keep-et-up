@@ -32,7 +32,7 @@ export class AddServerCommandImplementation extends Client {
                 basepath: await this.input("Server basepath: "),
                 homepath: await this.input("Server homepath: "),
                 mod: (await this.input("Server mod: ")) as any,
-                configs: ((await this.input("Server configs separated by ,: ")) as string).split(",").forEach(c => c.trim()) as any
+                configs: (await this.input("Server configs separated by ,:")).split(",").map(c => c.trim())
             };
 
             // build the packet

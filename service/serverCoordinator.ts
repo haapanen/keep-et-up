@@ -383,7 +383,7 @@ export class ServerCoordinator {
                     : this.options.paths.etded;
 
                 const screenArgs = ["-dmS", server.name + server.port];
-                const configArgs = this.createConfigArgs(server.configs);
+                const configArgs = this.createConfigArgs(server.configs ? server.configs : []);
                 const defaultMapArgs = ["+map", "oasis"];
                 const hunkMegs = ["+set com_hunkmegs", "128"];
                 const portArgs = ["+set net_port", "" + server.port];
