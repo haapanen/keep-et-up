@@ -1,12 +1,7 @@
 import * as zmq from "zmq";
 import {Response, ResponseStatus} from "../../lib/messages/response";
 import * as winston from "winston";
-import {StartServerCommand} from "../../lib/messages/commands/startServerCommand";
-import {StopServerCommand} from "../../lib/messages/commands/stopServerCommand";
-import {DeleteServerCommand} from "../../lib/messages/commands/deleteServerCommand";
-import {EditServerCommand} from "../../lib/messages/commands/editServerCommand";
-import {AddServerCommand} from "../../lib/messages/commands/addServerCommand";
-import {RestartServerCommand} from "../../lib/messages/commands/restartServerCommand";
+import * as _ from "lodash";
 
 export interface MessageReceiverOptions {
     readonly address: string;
@@ -60,11 +55,9 @@ export class MessageReceiver {
             }
 
             // send result back to the client
-            return this.socket.send(JSON.stringify({
+            return this.socket.send(JSON.stringify(_.extend(result, {
                 id: message.id,
-                success: result.status === ResponseStatus.Success,
-                message: result.message
-            }));
+            })));
         });
 
         winston.debug(`Listening to: ${this.options.address}`);

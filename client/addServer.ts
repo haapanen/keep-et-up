@@ -20,7 +20,7 @@ export class AddServerCommandImplementation extends Client {
     /**
      * Handles the add server main logic
      */
-    async run() {
+    async execute() {
         try {
             // Read attributes from user
             let server: Server = {
@@ -55,4 +55,4 @@ export class AddServerCommandImplementation extends Client {
 }
 
 const command = new AddServerCommandImplementation("tcp://localhost:42424");
-command.run();
+command.execute();

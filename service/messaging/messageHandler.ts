@@ -1,7 +1,7 @@
 import {Response, ResponseStatus} from "../../lib/messages/response";
 import {MessageType, Message} from "../../lib/messages/message";
 import {CommandType, Command} from "../../lib/messages/commands/command";
-import {QueryType} from "../../lib/messages/queries/Query";
+import {QueryType, Query} from "../../lib/messages/queries/query";
 import {StartServerCommand} from "../../lib/messages/commands/startServerCommand";
 import {StopServerCommand} from "../../lib/messages/commands/stopServerCommand";
 import {RestartServerCommand} from "../../lib/messages/commands/restartServerCommand";
@@ -9,6 +9,8 @@ import {AddServerCommand} from "../../lib/messages/commands/addServerCommand";
 import {EditServerCommand} from "../../lib/messages/commands/editServerCommand";
 import {DeleteServerCommand} from "../../lib/messages/commands/deleteServerCommand";
 import * as winston from "winston";
+import {ListServersQuery} from "../../lib/messages/queries/listServersQuery";
+import {ListServersResponse} from "../../lib/messages/queries/listServersResponse";
 export interface MessageHandlerOptions {
     readonly serverCoordinator: {
         startServer: (command: StartServerCommand) => Promise<Response>;
@@ -17,6 +19,7 @@ export interface MessageHandlerOptions {
         addServer: (command: AddServerCommand) => Promise<Response>;
         editServer: (command: EditServerCommand) => Promise<Response>;
         deleteServer: (command: DeleteServerCommand) => Promise<Response>;
+        listServers: (query: ListServersQuery) => Promise<ListServersResponse>;
     }
 }
 
@@ -125,7 +128,7 @@ export class MessageHandler {
      * @returns {Response}
      */
     private handleQuery(payload:any): Promise<Response> {
-        return new Promise<Response>((resolve, reject) => {
+        return new Promise<Response>(async (resolve, reject) => {
             try {
                 if (payload === undefined || payload === null) {
                     return resolve(this.failedOperationResponse("Query payload must be specified."));
@@ -135,7 +138,12 @@ export class MessageHandler {
                     return resolve(this.failedOperationResponse(`Invalid query type: ${QueryType[payload.type]} (${payload.type}).`));
                 }
 
-                return resolve(this.failedOperationResponse(`Query: ${QueryType[payload.type]} (${payload.type}) is not implemented.`));
+                switch ((payload as Query).type) {
+                    case QueryType.ListServers:
+                        return resolve(await this.options.serverCoordinator.listServers(payload));
+                    default:
+                        return resolve(this.failedOperationResponse(`Query: ${QueryType[payload.type]} (${payload.type}) is not implemented.`));
+                }
             } catch (ex) {
                 return reject(ex);
             }

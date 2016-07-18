@@ -15,7 +15,7 @@ export class StopServerCommandImplementation extends Client {
         });
     }
 
-    async run() {
+    async execute() {
         try {
             let name = process.argv[2] ? process.argv[2] : "";
             // build the packet
@@ -38,4 +38,4 @@ export class StopServerCommandImplementation extends Client {
 }
 
 const command = new StopServerCommandImplementation("tcp://localhost:42424");
-command.run();
+command.execute();

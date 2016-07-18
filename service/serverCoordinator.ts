@@ -1,5 +1,6 @@
 import * as childProcess from "child_process";
 import * as _ from "lodash";
+import * as moment from "moment";
 import {Response, ResponseStatus} from "../lib/messages/response";
 import {StartServerCommand} from "../lib/messages/commands/startServerCommand";
 import {StopServerCommand} from "../lib/messages/commands/stopServerCommand";
@@ -11,6 +12,8 @@ import * as winston from "winston";
 import {Server, mods} from "./bll/server";
 import {OsUtilities} from "../lib/utilities/osUtilities";
 import * as fs from "fs";
+import {ListServersQuery} from "../lib/messages/queries/listServersQuery";
+import {ListServersResponse} from "../lib/messages/queries/listServersResponse";
 
 /**
  * Required options for the server coordinator
@@ -32,6 +35,7 @@ export interface ServerCoordinatorOptions {
 interface ManagedServer extends Server {
     pid: number;
     restartAttempts: number;
+    lastRestartTime: moment.Moment;
 }
 
 enum ValidationStatus {
@@ -49,6 +53,7 @@ const NotRunning = -1;
 export class ServerCoordinator {
     private servers: ManagedServer[] = [];
     private watcherTimer: NodeJS.Timer;
+    private restartAttemptResetTimer: NodeJS.Timer;
 
     constructor(private options: ServerCoordinatorOptions) {
         let contents: string;
@@ -84,6 +89,7 @@ export class ServerCoordinator {
                     return resolve(this.failedOperationResponse(`Server ${payload.name} is already running.`));
                 }
 
+                server.restartAttempts = 0;
                 return resolve(await this.startServerProcess(server));
             } catch (ex) {
                 return reject(ex);
@@ -343,17 +349,29 @@ export class ServerCoordinator {
                 .forEach(async (server) => {
                     if (!OsUtilities.isRunning(server.pid) && server.restartAttempts < 5) {
                         winston.info(`Server ${server.name} should be running. Restarting (previous attempts: ${server.restartAttempts}).`);
+                        server.restartAttempts++;
+                        server.lastRestartTime = moment();
                         let result = await this.startServerProcess(server);
                         if (result.status === ResponseStatus.Failure) {
                             winston.error(`Could not restart server: ${server.name}. ${result.message}.`);
-                            server.restartAttempts++;
                             this.saveServers();
-                        } else {
-                            server.restartAttempts = 0;
                         }
+                    } else if (server.restartAttempts >= 5) {
+                        winston.warn(`Could not restart server: ${server.name}. Tried to restart 5 times.`);
+                        server.pid = NotRunning;
+                        this.saveServers();
                     }
                 });
         }, 1000);
+
+        this.restartAttemptResetTimer = setInterval(() => {
+            this.servers.filter(s => s.pid !== NotRunning).forEach(async (server) => {
+                if (OsUtilities.isRunning(server.pid)) {
+                    server.restartAttempts = 0;
+                }
+            });
+            this.saveServers();
+        }, 1000 * 60);
     }
 
     private startServerProcess(server:ManagedServer): Promise<Response> {
@@ -404,5 +422,34 @@ export class ServerCoordinator {
             return resolve(this.successfulOperationResponse(`Started server: ${server.name}`));
         });
 
+    }
+
+    listServers(query: ListServersQuery): Promise<ListServersResponse> {
+        return new Promise<ListServersResponse>((resolve, reject) => {
+            try {
+                let response: ListServersResponse = {
+                    message: "",
+                    servers: this.servers.map(s => {
+                        return {
+                            address: s.address,
+                            basepath: s.basepath,
+                            configs: s.configs,
+                            customExecutable: s.customExecutable,
+                            homepath: s.homepath,
+                            mod: s.mod,
+                            name: s.name,
+                            port: s.port,
+                            user: s.user,
+                            running: s.pid !== NotRunning
+                        };
+                    }),
+                    status: ResponseStatus.Success
+                };
+
+                return resolve(response);
+            } catch (exception) {
+                return reject(exception);
+            }
+        });
     }
 }
