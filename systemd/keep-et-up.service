@@ -8,20 +8,23 @@
 # `/path/to/node` => path to the Node.js binary
 # `/path/to/keep-et-up` => path to the keep-et-up installation directory
 # Replace the path to keep-et-up directory.
-# run `sudo systemctl start keep-et-up`
+# run:
+# `sudo systemctl enable keep-et-up` This starts the service on reboot
+# `sudo systemctl start keep-et-up` This starts the service right now
 
 [Unit]
 Description=Starts the Keep ET up application to manage Wolfenstein: Enemy Territory servers.
 After=network.target
 
 [Service]
-Type=forking
+Type=simple
 PIDFile=/run/keep-et-up.pid
 WorkingDirectory=/path/to/keep-et-up
 ExecStart=/path/to/node /path/to/keep-et-up/service/service.js
 ExecStop=-/sbin/start-stop-daemon --quiet --stop --retry QUIT/5 --pidfile /run/keep-et-up.pid
 TimeoutStopSec=5
-KillMode=mixed
+KillMode=process
+Restart=always
 
 [Install]
 WantedBy=multi-user.target

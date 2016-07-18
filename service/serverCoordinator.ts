@@ -183,7 +183,7 @@ export class ServerCoordinator {
                     return resolve(this.failedOperationResponse(validationMessage));
                 }
 
-                this.servers.push(_.extend({}, payload.server, { pid: NotRunning, restartAttempts: 0 }) as any);
+                this.servers.push(_.extend({}, payload.server, { pid: NotRunning, restartAttempts: 0, lastRestartTime: moment() }) as any);
 
                 winston.debug("Saving servers");
                 await this.saveServers();

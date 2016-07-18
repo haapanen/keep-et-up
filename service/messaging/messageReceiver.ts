@@ -37,27 +37,31 @@ export class MessageReceiver {
                 }));
             }
 
-            // if there's no id, it's an invalid msg
-            if (!message.id) {
-                return this.socket.send(JSON.stringify({
-                    success: false,
-                    message: "Each message must have a unique id."
-                }));
+            try {
+                // if there's no id, it's an invalid msg
+                if (!message.id) {
+                    return this.socket.send(JSON.stringify({
+                        success: false,
+                        message: "Each message must have a unique id."
+                    }));
+                }
+
+                // try to handle the message
+                let result = await this.options.messageHandler.messageReceived(message);
+
+                if (result.status === ResponseStatus.Failure) {
+                    winston.info(`Failed request: (${result.message}) ${JSON.stringify(message, null, 4)}`);
+                } else {
+                    winston.info("Successful request: " + JSON.stringify(message, null, 4));
+                }
+
+                // send result back to the client
+                return this.socket.send(JSON.stringify(_.extend(result, {
+                    id: message.id,
+                })));
+            } catch (exception) {
+                winston.error(exception);
             }
-
-            // try to handle the message
-            let result = await this.options.messageHandler.messageReceived(message);
-
-            if (result.status === ResponseStatus.Failure) {
-                winston.info(`Failed request: (${result.message}) ${JSON.stringify(message, null, 4)}`);
-            } else {
-                winston.info("Successful request: " + JSON.stringify(message, null, 4));
-            }
-
-            // send result back to the client
-            return this.socket.send(JSON.stringify(_.extend(result, {
-                id: message.id,
-            })));
         });
 
         winston.debug(`Listening to: ${this.options.address}`);
