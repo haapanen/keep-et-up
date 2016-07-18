@@ -1,0 +1,27 @@
+#######################################################################
+# Description:
+# Example systemd service definition for Ubuntu 16.04 for keep-et-up
+#######################################################################
+# Usage:
+# Copy this file to the `/etc/systemd/system` directory.
+# Replace paths:
+# `/path/to/node` => path to the Node.js binary
+# `/path/to/keep-et-up` => path to the keep-et-up installation directory
+# Replace the path to keep-et-up directory.
+# run `sudo systemctl start keep-et-up`
+
+[Unit]
+Description=Starts the Keep ET up application to manage Wolfenstein: Enemy Territory servers.
+After=network.target
+
+[Service]
+Type=forking
+PIDFile=/run/keep-et-up.pid
+WorkingDirectory=/path/to/keep-et-up
+ExecStart=/path/to/node /path/to/keep-et-up/service/service.js
+ExecStop=-/sbin/start-stop-daemon --quiet --stop --retry QUIT/5 --pidfile /run/keep-et-up.pid
+TimeoutStopSec=5
+KillMode=mixed
+
+[Install]
+WantedBy=multi-user.target
